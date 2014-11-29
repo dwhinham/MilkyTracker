@@ -1,7 +1,7 @@
 /*
  *  ppui/sdl/DisplayDeviceFB_SDL.cpp
  *
- *  Copyright 2009 Peter Barth, Christopher O'Neill
+ *  Copyright 2009 Peter Barth, Christopher O'Neill, Dale Whinham
  *
  *  This file is part of Milkytracker.
  *
@@ -18,40 +18,86 @@
  *  You should have received a copy of the GNU General Public License
  *  along with Milkytracker.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *  12/5/14 - Dale Whinham
+ *    - Port to SDL2
+ *    - Resizable window which renders to a scaled texture
+ *    - Experimental, buggy Retina support (potential problems with mouse coordinates if letterboxing happens)
+ *
+ *    TODO: - Test under Linux (only tested under OSX)
+ *          - Test/fix/remove scale factor and orientation code
+ *          - Look at the OpenGL stuff
  */
 
 #include "DisplayDeviceFB_SDL.h"
 #include "Graphics.h"
 
-PPDisplayDeviceFB::PPDisplayDeviceFB(SDL_Surface*& screen, 
-									 pp_int32 width, 
+PPDisplayDeviceFB::PPDisplayDeviceFB(pp_int32 width,
 									 pp_int32 height, 
 									 pp_int32 scaleFactor,
 									 pp_int32 bpp,
 									 bool fullScreen, 
 									 Orientations theOrientation/* = ORIENTATION_NORMAL*/, 
 									 bool swapRedBlue/* = false*/) :
-	PPDisplayDevice(screen, width, height, scaleFactor, bpp, fullScreen, theOrientation),
+	PPDisplayDevice(width, height, scaleFactor, bpp, fullScreen, theOrientation),
 	needsTemporaryBuffer((orientation != ORIENTATION_NORMAL) || (scaleFactor != 1)),
-	temporaryBuffer(NULL)	
+	temporaryBuffer(NULL)
 {
-	const SDL_VideoInfo* videoinfo;
+	// Create an SDL window and surface
+	theSurface = CreateScreen(realWidth, realHeight, bpp,
+#ifdef HIDPI_SUPPORT
+							  SDL_WINDOW_ALLOW_HIGHDPI |							// Support for 'Retina'/Hi-DPI displays
+#endif
+							  SDL_WINDOW_RESIZABLE	 |								// MilkyTracker's window is resizable
+							  (bFullScreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));	// Use 'fake fullscreen' because we can scale
 
-	/* Some SDL to get display format */
-	videoinfo = SDL_GetVideoInfo();
-	if (bpp == -1) 
+	if (theSurface == NULL)
 	{
-		bpp = videoinfo->vfmt->BitsPerPixel > 16 ? videoinfo->vfmt->BitsPerPixel : 16;
+		fprintf(stderr, "SDL: Could not create window.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	// We got a surface: update bpp value
+	bpp = theSurface->format->BitsPerPixel;
+
+#ifdef HIDPI_SUPPORT
+	// Feed SDL_RenderSetLogicalSize() with output size, not GUI surface size, otherwise mouse coordinates will be wrong for Hi-DPI
+	int rendererW, rendererH;
+	SDL_GetRendererOutputSize(theRenderer, &rendererW, &rendererH);
+
+	// If we got a renderer output size that isn't the same as the surface size, assume we have Hi-DPI and need the letterbox workaround
+	if (rendererW != width)
+	{
+		needsDeLetterbox = true;
+		fprintf(stderr, "SDL: Deletterbox hack enabled. (rendererW: %d, width: %d)\n", rendererW, width);
+	}
+	else
+	{
+		fprintf(stderr, "SDL: Deletterbox hack disabled. (rendererW: %d, width: %d)\n", rendererW, width);
+	}
+#endif
+
+	SDL_RendererInfo* theRendererInfo = new SDL_RendererInfo;
+	if (!SDL_GetRendererInfo(theRenderer, theRendererInfo))
+	{
+		if (theRendererInfo->flags & SDL_RENDERER_SOFTWARE) printf("SDL: Using software renderer.\n");
+		if (theRendererInfo->flags & SDL_RENDERER_ACCELERATED) printf("SDL: Using accelerated renderer.\n");
+		if (theRendererInfo->flags & SDL_RENDERER_PRESENTVSYNC) printf("SDL: Vsync enabled.\n");
+		if (theRendererInfo->flags & SDL_RENDERER_TARGETTEXTURE) printf("SDL: Renderer supports rendering to texture.\n");
 	}
 
-	/* Set a video mode */	
-	theSurface = screen = CreateScreen(realWidth, realHeight, 
-									   bpp, SDL_SWSURFACE | (bFullScreen==true ? SDL_FULLSCREEN : 0));
-	if ( screen == NULL ) 
-	{
-		fprintf(stderr, "Could not set video mode: %s\n", SDL_GetError());	
-		exit(2);
-	}	
+	// Lock aspect ratio and scale the UI up to fit the window
+#ifdef HIDPI_SUPPORT
+	SDL_RenderSetLogicalSize(theRenderer, rendererW, rendererH);
+#else
+	SDL_RenderSetLogicalSize(theRenderer, realWidth, realHeight);
+#endif
+
+	// Use linear filtering for the scaling (make this optional eventually)
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+
+	// Streaming texture for rendering the UI
+	theTexture = SDL_CreateTexture(theRenderer, theSurface->format->format,
+								   SDL_TEXTUREACCESS_STREAMING, realWidth, realHeight);
 
 	switch (bpp)
 	{
@@ -64,15 +110,15 @@ PPDisplayDeviceFB::PPDisplayDeviceFB(SDL_Surface*& screen,
 			PPGraphics_24bpp_generic* g = new PPGraphics_24bpp_generic(width, height, 0, NULL);
 			if (swapRedBlue)
 			{
-				g->setComponentBitpositions(videoinfo->vfmt->Bshift, 
-											videoinfo->vfmt->Gshift, 
-											videoinfo->vfmt->Rshift);
+				g->setComponentBitpositions(theSurface->format->Bshift,
+											theSurface->format->Gshift,
+											theSurface->format->Rshift);
 			}
 			else
 			{
-				g->setComponentBitpositions(videoinfo->vfmt->Rshift, 
-											videoinfo->vfmt->Gshift, 
-											videoinfo->vfmt->Bshift);
+				g->setComponentBitpositions(theSurface->format->Rshift,
+											theSurface->format->Gshift,
+											theSurface->format->Bshift);
 			}
 			currentGraphics = static_cast<PPGraphicsAbstract*>(g);
 			break;
@@ -83,22 +129,22 @@ PPDisplayDeviceFB::PPDisplayDeviceFB(SDL_Surface*& screen,
 			PPGraphics_32bpp_generic* g = new PPGraphics_32bpp_generic(width, height, 0, NULL);
 			if (swapRedBlue)
 			{
-				g->setComponentBitpositions(videoinfo->vfmt->Bshift, 
-											videoinfo->vfmt->Gshift, 
-											videoinfo->vfmt->Rshift);
+				g->setComponentBitpositions(theSurface->format->Bshift,
+											theSurface->format->Gshift,
+											theSurface->format->Rshift);
 			}
 			else
 			{
-				g->setComponentBitpositions(videoinfo->vfmt->Rshift, 
-											videoinfo->vfmt->Gshift, 
-											videoinfo->vfmt->Bshift);
+				g->setComponentBitpositions(theSurface->format->Rshift,
+											theSurface->format->Gshift,
+											theSurface->format->Bshift);
 			}
 			currentGraphics = static_cast<PPGraphicsAbstract*>(g);
 			break;
 		}
 			
 		default:
-			fprintf(stderr, "Unsupported color depth (%i), try either 16, 24 or 32", bpp);	
+			fprintf(stderr, "SDL: Unsupported color depth (%i), try either 16, 24 or 32", bpp);
 			exit(2);
 	}
 	
@@ -161,7 +207,11 @@ void PPDisplayDeviceFB::update()
 	PPRect r(0, 0, getSize().width, getSize().height);
 	swap(r);
 	
-	SDL_UpdateRect(theSurface, 0, 0, 0, 0);
+	// Update entire texture and copy to renderer
+	SDL_UpdateTexture(theTexture, NULL, theSurface->pixels, theSurface->pitch);
+	SDL_RenderClear(theRenderer);
+	SDL_RenderCopy(theRenderer, theTexture, NULL, NULL);
+	SDL_RenderPresent(theRenderer);
 }
 
 void PPDisplayDeviceFB::update(const PPRect& r)
@@ -174,15 +224,23 @@ void PPDisplayDeviceFB::update(const PPRect& r)
 		return;
 	}
 
-	PPRect r2(r);
-	swap(r2);
-
-	PPRect r3(r);
-	r3.scale(scaleFactor);
+	swap(r);
 	
-	transformInverse(r3);
+	PPRect r2(r);
+	r2.scale(scaleFactor);
+	
+	transformInverse(r2);
 
-	SDL_UpdateRect(theSurface, r3.x1, r3.y1, (r3.x2-r3.x1), (r3.y2-r3.y1));
+	SDL_Rect r3 = { r2.x1, r2.y1, r2.width(), r2.height() };
+	
+	// Calculate destination pixel data offset based on row pitch and x coordinate
+	void* surfaceOffset = (char*) theSurface->pixels + r2.y1 * theSurface->pitch + r2.x1 * theSurface->format->BytesPerPixel;
+	
+	// Update dirty area of texture and copy to renderer
+	SDL_UpdateTexture(theTexture, &r3, surfaceOffset, theSurface->pitch);
+	SDL_RenderClear(theRenderer);
+	SDL_RenderCopy(theRenderer, theTexture, NULL, NULL);
+	SDL_RenderPresent(theRenderer);
 }
 
 void PPDisplayDeviceFB::swap(const PPRect& r2)
@@ -305,7 +363,7 @@ void PPDisplayDeviceFB::swap(const PPRect& r2)
 				}
 				
 				default:
-					fprintf(stderr, "Unsupported color depth for requested orientation");	
+					fprintf(stderr, "SDL: Unsupported color depth for requested orientation");
 					exit(2);
 			}
 			
@@ -471,7 +529,7 @@ void PPDisplayDeviceFB::swap(const PPRect& r2)
 				}
 				
 				default:
-					fprintf(stderr, "Unsupported color depth for requested orientation");	
+					fprintf(stderr, "SDL: Unsupported color depth for requested orientation");
 					exit(2);
 			}
 		
@@ -636,14 +694,12 @@ void PPDisplayDeviceFB::swap(const PPRect& r2)
 				}
 				
 				default:
-					fprintf(stderr, "Unsupported color depth for requested orientation");	
+					fprintf(stderr, "SDL: Unsupported color depth for requested orientation");
 					exit(2);
 			}
 
-			SDL_UnlockSurface(theSurface);				
-		
+			SDL_UnlockSurface(theSurface);
 			break;
 		}
-
 	}
 }
