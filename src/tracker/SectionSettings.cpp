@@ -415,7 +415,7 @@ public:
 
 		PPButton* button = new PPButton(BUTTON_SETTINGS_CHOOSEDRIVER, screen, this, PPPoint(x + 4 + 7*8 + 4, y2 + 3), PPSize(90, 11));
 		button->setFont(PPFont::getFont(PPFont::FONT_TINY));
-		button->setText("Select Driver"PPSTR_PERIODS);
+		button->setText("Select Driver" PPSTR_PERIODS);
 		container->addControl(button);
 
 		y2+=4;
@@ -464,7 +464,7 @@ public:
 		container->addControl(new PPStaticText(0, NULL, NULL, PPPoint(x + 4, y2), "Resampling:", true));
 		button = new PPButton(BUTTON_SETTINGS_RESAMPLING, screen, this, PPPoint(x + 4 + 11*8 + 4, y2-2), PPSize(6*9 + 4, 11));
 		button->setFont(PPFont::getFont(PPFont::FONT_TINY));
-		button->setText("Select"PPSTR_PERIODS);
+		button->setText("Select" PPSTR_PERIODS);
 		container->addControl(button);
 
 		y2+=12;
@@ -1565,7 +1565,7 @@ public:
 		
 		PPStaticText* text;
 		
-		container->addControl(new PPStaticText(0, NULL, NULL, PPPoint(x2 + 2, y2 + 2), "Load module"PPSTR_PERIODS, true, true));
+		container->addControl(new PPStaticText(0, NULL, NULL, PPPoint(x2 + 2, y2 + 2), "Load module" PPSTR_PERIODS, true, true));
 		
 		y2+=12;
 		
@@ -2983,7 +2983,7 @@ void SectionSettings::showCustomResolutionMessageBox()
 	dialog = new DialogWithValues(tracker.screen, 
 								  responder, 
 								  RESPONDMESSAGEBOX_CUSTOMRESOLUTION, 
-								  "Enter custom resolution"PPSTR_PERIODS, 
+								  "Enter custom resolution" PPSTR_PERIODS,
 								  DialogWithValues::ValueStyleEnterTwoValues);
 														
 	static_cast<DialogWithValues*>(dialog)->setValueOneCaption("Width in pixels:");
@@ -3146,10 +3146,10 @@ void SectionSettings::importCurrentColorPalette()
 	
 	panel.addExtensions(fileExtProvider.getColorExtensions());
 	
-	if (panel.runModal() == PPModalDialog::ReturnCodeOK)
+	panel.runModal([&](PPModalDialog::ReturnCodes, PPString filename)
 	{
 		TColorPalette pal;
-		ColorExportImport exportImport(panel.getFileName());
+		ColorExportImport exportImport(filename);
 		
 		if (exportImport.importColorPalette(pal))
 		{
@@ -3160,13 +3160,13 @@ void SectionSettings::importCurrentColorPalette()
 						
 			update();
 			
-			lastColorFile = panel.getFileName();
+			lastColorFile = filename;
 		}
 		else
 		{
 			tracker.showMessageBox(MESSAGEBOX_UNIVERSAL, "Unrecognized type/corrupt file", Tracker::MessageBox_OK);			
 		}
-	}
+	});
 }
 
 void SectionSettings::exportCurrentColorPalette()
@@ -3181,7 +3181,7 @@ void SectionSettings::exportCurrentColorPalette()
 	
 	panel.addExtensions(fileExtProvider.getColorExtensions());
 	
-	if (panel.runModal() == PPModalDialog::ReturnCodeOK)
+	panel.runModal([&](PPModalDialog::ReturnCodes, PPString)
 	{
 		TColorPalette pal;
 		
@@ -3195,7 +3195,7 @@ void SectionSettings::exportCurrentColorPalette()
 		{
 			tracker.showMessageBox(MESSAGEBOX_UNIVERSAL, "Could not create file", Tracker::MessageBox_OK);						
 		}
-	}
+	});
 }
 
 void SectionSettings::retrieveDisplayResolution()

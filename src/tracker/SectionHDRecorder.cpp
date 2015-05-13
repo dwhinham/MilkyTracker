@@ -491,7 +491,7 @@ void SectionHDRecorder::init(pp_int32 px, pp_int32 py)
 	container->addControl(new PPStaticText(0, NULL, NULL, PPPoint(x2, y2), "Resampler:", true));
 	button = new PPButton(HDRECORD_BUTTON_RESAMPLING, screen, this, PPPoint(x2 + 8*10 + 4, y2-2), PPSize(6*7 + 4, 11));
 	button->setFont(PPFont::getFont(PPFont::FONT_TINY));
-	button->setText("Select"PPSTR_PERIODS);
+	button->setText("Select" PPSTR_PERIODS);
 	container->addControl(button);
 
 	container->addControl(new PPStaticText(0, NULL, NULL, PPPoint(x2, y2 + 12), "Volume ramping:", true));
@@ -550,7 +550,7 @@ void SectionHDRecorder::init(pp_int32 px, pp_int32 py)
 	container->addControl(button);
 
 	button = new PPButton(HDRECORD_BUTTON_RECORD_AS, screen, this, PPPoint(x2+buttonWidth+1, y2), PPSize(34,buttonHeight));
-	button->setText("As"PPSTR_PERIODS);
+	button->setText("As" PPSTR_PERIODS);
 	container->addControl(button);
 
 	y2+=buttonHeight+2;
@@ -744,16 +744,14 @@ void SectionHDRecorder::exportWAVWithPanel(const PPSystemString& defaultFileName
 	PPSavePanel savePanel(tracker.screen, "Export Song to WAV", defaultFileName);
 	savePanel.addExtension("wav","Uncompressed WAV");
 	
-	if (savePanel.runModal() == PPModalDialog::ReturnCodeOK)
+	savePanel.runModal([&] (PPModalDialog::ReturnCodes code, PPString filename)
 	{
-		const SYSCHAR* finalFileName = savePanel.getFileName();
-		
-		if (finalFileName)
+		if (code == PPModalDialog::ReturnCodeOK && filename)
 		{
-			currentFileName = finalFileName;
-			exportWAVAsFileName(finalFileName);			
+			currentFileName = filename;
+			exportWAVAsFileName(filename);
 		}
-	}
+	});
 }
 
 void SectionHDRecorder::exportWAVAsFileName(const PPSystemString& fileName)

@@ -32,15 +32,12 @@
 #include <SDL.h>
 #include "SDL_ModalLoop.h"
 #include "DialogFileSelector.h"
+#include "PPModalDialog.h"
 
-PPQuitSaveAlert::ReturnCodes PPQuitSaveAlert::runModal()
+void PPQuitSaveAlert::runModal(std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion)
 {
 	// Create a message box (the message box will invoke the responder)
 	PPDialogBase* dialog = new PPDialogBase(screen, NULL, PP_DEFAULT_ID, "Save current changes?", PPDialogBase::MessageBox_YESNOCANCEL);
 
-	ReturnCodes result = SDL_runModalLoop(screen, dialog);
-	
-	delete dialog;
-	
-	return result;
+	SDL_runModalLoop(screen, dialog, onCompletion);
 }

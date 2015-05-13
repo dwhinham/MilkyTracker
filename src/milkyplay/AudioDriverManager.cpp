@@ -104,22 +104,25 @@ AudioDriverManager::AudioDriverManager() :
 
 #ifdef __MACOSX_CORE__
 #include "AudioDriver_RTAUDIO.h"
+#include "AudioDriver_SDL.h"
 #endif
 
 AudioDriverManager::AudioDriverManager() :
 	defaultDriverIndex(0)
 {
 #ifdef __MACOSX_CORE__
-	ALLOC_DRIVERLIST(3);
+	ALLOC_DRIVERLIST(4);
 
 	driverList[0] = new AudioDriver_COREAUDIO();
 	driverList[1] = new AudioDriver_RTAUDIO();
 	driverList[2] = new AudioDriver_RTAUDIO(AudioDriver_RTAUDIO::MACOSX_CORE);
+	driverList[3] = new AudioDriver_SDL();
 #else
 	ALLOC_DRIVERLIST(1);
 	driverList[0] = new AudioDriver_COREAUDIO();
 #endif
 }
+
 
 #elif defined(DRIVER_UNIX)
 //////////////////////////////////////////////////////////////////

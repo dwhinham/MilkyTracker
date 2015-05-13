@@ -33,7 +33,7 @@
 #include "SDL_ModalLoop.h"
 #include "DialogFileSelector.h"
 
-PPMessageBox::ReturnCodes PPMessageBox::runModal()
+void PPMessageBox::runModal(std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion)
 {
 	// Convert texts
 	char* captionASCIIZ = this->caption.toASCIIZ();
@@ -46,9 +46,5 @@ PPMessageBox::ReturnCodes PPMessageBox::runModal()
 	// Create a message box (the message box will invoke the responder)
 	PPDialogBase* dialog = new PPDialogBase(screen, NULL, PP_DEFAULT_ID, caption, content);
 
-	ReturnCodes result = SDL_runModalLoop(screen, dialog);
-	
-	delete dialog;
-	
-	return result;
+	SDL_runModalLoop(screen, dialog, onCompletion);
 }

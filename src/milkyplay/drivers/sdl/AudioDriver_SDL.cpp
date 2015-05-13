@@ -45,9 +45,9 @@ void SDLCALL AudioDriver_SDL::fill_audio(void *udata, Uint8 *stream, int length)
 {
 	AudioDriver_SDL* audioDriver = (AudioDriver_SDL*)udata;
 
-	if(length>>2 != audioDriver->periodSize)
+	if(length / 4 != audioDriver->periodSize)
 	{
-		fprintf(stderr, "SDL: Invalid buffer size: %i (should be %i), skipping..\n", length >> 2, audioDriver->periodSize);
+		fprintf(stderr, "SDL: Invalid buffer size: %i (should be %i), skipping..\n", length / 4, audioDriver->periodSize);
 	}
 	// See comment in AudioDriver_ALSA.cpp
 	else
@@ -70,7 +70,7 @@ AudioDriver_SDL::~AudioDriver_SDL()
 // otherwise return the number of 16 bit words contained in the obtained buffer
 mp_sint32 AudioDriver_SDL::initDevice(mp_sint32 bufferSizeInWords, mp_uint32 mixFrequency, MasterMixer* mixer)
 {
-	SDL_AudioSpec	wanted, obtained, saved;
+	SDL_AudioSpec	wanted = {}, obtained = {}, saved = {};
 	char name[32];
 	mp_sint32 res = AudioDriverBase::initDevice(bufferSizeInWords, mixFrequency, mixer);
 	if (res < 0)
@@ -81,8 +81,13 @@ mp_sint32 AudioDriver_SDL::initDevice(mp_sint32 bufferSizeInWords, mp_uint32 mix
 	wanted.freq = mixFrequency;
 	wanted.format = AUDIO_S16SYS;
 	wanted.channels = 2; /* 1 = mono, 2 = stereo */
-	wanted.samples = bufferSizeInWords / wanted.channels; /* Good low-latency value for callback */
 
+#ifndef EMSCRIPTEN
+	wanted.samples = bufferSizeInWords / wanted.channels; /* Good low-latency value for callback */
+#else
+	wanted.samples = 512 / wanted.channels;
+#endif
+	
 	wanted.callback = fill_audio;
 	wanted.userdata = (void*)this;
 
@@ -91,11 +96,20 @@ mp_sint32 AudioDriver_SDL::initDevice(mp_sint32 bufferSizeInWords, mp_uint32 mix
 	// Some soundcard drivers modify the wanted structure, so we copy it here
 	memcpy(&saved, &wanted, sizeof(wanted));
 
-	if(SDL_OpenAudio(&wanted, &obtained) < 0)
+//	if(SDL_OpenAudio(&wanted, &obtained) < 0)
+//	{
+//		memcpy(&wanted, &saved, sizeof(wanted));
+//		fprintf(stderr, "SDL: Failed to open audio device! (buffer = %d bytes)..\n", saved.samples*4);
+//		fprintf(stderr, "SDL: Try setting \"Force 2^n sizes\" in the config menu and restarting.\n");
+//		return MP_DEVICE_ERROR;
+//	}
+	
+	if((deviceID = SDL_OpenAudioDevice(NULL, 0, &wanted, &obtained, 0)) == 0)
 	{
 		memcpy(&wanted, &saved, sizeof(wanted));
 		fprintf(stderr, "SDL: Failed to open audio device! (buffer = %d bytes)..\n", saved.samples*4);
 		fprintf(stderr, "SDL: Try setting \"Force 2^n sizes\" in the config menu and restarting.\n");
+		fprintf(stderr, "SDL: Error: %s\n", SDL_GetError());
 		return MP_DEVICE_ERROR;
 	}
 
@@ -130,33 +144,33 @@ mp_sint32 AudioDriver_SDL::initDevice(mp_sint32 bufferSizeInWords, mp_uint32 mix
 
 mp_sint32 AudioDriver_SDL::stop()
 {
-	SDL_PauseAudio(1);
+	SDL_PauseAudioDevice(deviceID, 1);
 	deviceHasStarted = false;
 	return MP_OK;
 }
 
 mp_sint32 AudioDriver_SDL::closeDevice()
 {
-	SDL_CloseAudio();
+	SDL_CloseAudioDevice(deviceID);
 	deviceHasStarted = false;
 	return MP_OK;
 }
 
 mp_sint32 AudioDriver_SDL::start()
 {
-	SDL_PauseAudio(0);
+	SDL_PauseAudioDevice(deviceID, 0);
 	deviceHasStarted = true;
 	return MP_OK;
 }
 
 mp_sint32 AudioDriver_SDL::pause()
 {
-	SDL_PauseAudio(1);
+	SDL_PauseAudioDevice(deviceID, 1);
 	return MP_OK;
 }
 
 mp_sint32 AudioDriver_SDL::resume()
 {
-	SDL_PauseAudio(0);
+	SDL_PauseAudioDevice(deviceID, 0);
 	return MP_OK;
 }

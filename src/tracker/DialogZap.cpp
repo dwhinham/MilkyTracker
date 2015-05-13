@@ -49,7 +49,6 @@ DialogZap::DialogZap(PPScreen* screen,
 	PPDialogBase()
 {
 	parentScreen = screen;
-	setResponder(responder);
 
 	const pp_int32 height = 74;
 	const pp_int32 width = 290;
@@ -59,10 +58,10 @@ DialogZap::DialogZap(PPScreen* screen,
 
 	PPMessageBoxContainer* container = new PPMessageBoxContainer(id, screen, this, PPPoint(x, y), PPSize(width,height), "System request");
 
-	pp_int32 x2 = x + width / 2 - (PPFont::getFont(PPFont::FONT_SYSTEM)->getStrWidth("Total devastation of the"PPSTR_PERIODS) / 2);
+	pp_int32 x2 = x + width / 2 - (PPFont::getFont(PPFont::FONT_SYSTEM)->getStrWidth("Total devastation of the" PPSTR_PERIODS) / 2);
 	pp_int32 y2 = y + 20;
 
-	container->addControl(new PPStaticText(0, screen, this, PPPoint(x2, y2), "Total devastation of the"PPSTR_PERIODS, true));
+	container->addControl(new PPStaticText(0, screen, this, PPPoint(x2, y2), "Total devastation of the" PPSTR_PERIODS, true));
 
 	PPButton* button = new PPButton(MESSAGEBOXZAP_BUTTON_ALL, screen, this, PPPoint(x+10, y2 + 15), PPSize(60, 11));
 	button->setText("All");

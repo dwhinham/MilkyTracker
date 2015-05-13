@@ -144,8 +144,6 @@ public:
 	
 	virtual ~PPDialogBase();
 	
-	void setResponder(DialogResponder* responder) { respondListener = responder; }
-	
 	PPMessageBoxContainer* getMessageBoxContainer() const { return messageBoxContainerGeneric; }
 	void setMessageBoxContainer(PPMessageBoxContainer* container);
 	

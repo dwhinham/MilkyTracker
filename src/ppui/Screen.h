@@ -39,6 +39,9 @@
 #include "DisplayDeviceBase.h"
 #include "SimpleVector.h"
 #include "Control.h"
+#include "PPModalDialog.h"
+#include "PPMessageBox.h"
+#include "DialogBase.h"
 
 // Forwards
 class PPControl;
@@ -68,6 +71,9 @@ protected:
 	bool showDragHilite;
 	
 	PPContainer* rootContainer;
+	
+	PPDialogBase* currentModal;
+
 
 private:
 	PPPoint lastMousePoint;
@@ -163,6 +169,8 @@ public:
 	MouseCursorTypes getCurrentActiveMouseCursor() const;
 	
 	void shutDown();
+	
+	void startModal(PPDialogBase *dialog, std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion);
 };
 
 #endif

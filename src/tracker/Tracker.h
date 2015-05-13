@@ -29,6 +29,8 @@
 #include "FileTypes.h"
 #include "XModule.h"
 
+#include <functional> /* u wot m8? */
+
 #define INPUTCONTAINERHEIGHT_DEFAULT	(25+SCROLLBUTTONSIZE+4)
 #define INPUTCONTAINERHEIGHT_EXTENDED	(25+SCROLLBUTTONSIZE+4+13)
 
@@ -341,8 +343,8 @@ private:
 	
 	void setChanged();
 
-	bool checkForChanges(ModuleEditor* module = NULL);
-	bool checkForChangesOpenModule();
+	void checkForChanges(ModuleEditor* module, std::function<void(bool)> onCompletion);
+	void checkForChangesOpenModule(std::function<void(bool)> onCompletion);
 	
 	bool swapAndCopyHandler(pp_int32 messageBoxID, pp_int32 messageBoxButtonID);
 	void handleQuit();
@@ -413,13 +415,15 @@ private:
 						  bool repaint = true, 
 						  bool saveCheck = true);
 
-	bool loadTypeWithDialog(FileTypes eType, 
-							bool suspendPlayer = true, 
-							bool repaint = true);
+	void loadTypeWithDialog(FileTypes eType,
+							bool suspendPlayer,
+							bool repaint,
+							void (* onCompletion)(bool success));
+	
 	void loadType(FileTypes eType);
 	
 	bool prepareSavingWithDialog(FileTypes eType);
-	bool saveTypeWithDialog(FileTypes eType, EventListenerInterface* fileSystemChangedListener = NULL);
+	void saveTypeWithDialog(FileTypes eType, EventListenerInterface* fileSystemChangedListener = NULL);
 	bool saveCurrentModuleAsSelectedType();
 	void saveType(FileTypes eType);
 	void save();
@@ -456,7 +460,7 @@ public:
 	void startUp(bool forceNoSplash = false);
 		
 	// Tracker shutdown
-	bool shutDown();
+	void shutDown(std::function<void(bool shutDown)> onShutDown);
 	
 	mp_sint32 saveModule(const PPSystemString& fileName);
 

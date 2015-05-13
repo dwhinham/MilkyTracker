@@ -2592,7 +2592,7 @@ bool Tracker::prepareLoading(FileTypes eType, const PPSystemString& fileName, bo
 
 	loadingParameters.res = true;
 	
-	if (saveCheck && eType == FileTypes::FileTypeSongAllModules && !checkForChangesOpenModule())
+	if (saveCheck && eType == FileTypes::FileTypeSongAllModules)
 		return false;
 	
 	loadingParameters.lastError = "Error while loading/unknown format";	
@@ -2741,7 +2741,7 @@ bool Tracker::loadTypeFromFile(FileTypes eType, const PPSystemString& fileName, 
 					delete responder;
 					
 				responder = new SampleLoadChannelSelectionHandler(*this);				
-				dialog = new DialogChannelSelector(screen, responder, PP_DEFAULT_ID, "Choose channel to load"PPSTR_PERIODS);	
+				dialog = new DialogChannelSelector(screen, responder, PP_DEFAULT_ID, "Choose channel to load" PPSTR_PERIODS);
 				
 				// Add names of sample channels to instrument box
 				for (pp_int32 i = 0; i < numSampleChannels; i++)
@@ -2784,7 +2784,7 @@ bool Tracker::loadTypeFromFile(FileTypes eType, const PPSystemString& fileName, 
 }
 
 // load different things
-bool Tracker::loadTypeWithDialog(FileTypes eLoadType, bool suspendPlayer/* = true*/, bool repaint/* = true*/)
+void Tracker::loadTypeWithDialog(FileTypes eLoadType, bool suspendPlayer/* = true*/, bool repaint/* = true*/, void (* onCompletion)(bool success))
 {
 	FileExtProvider fileExtProvider;
 
@@ -2794,10 +2794,12 @@ bool Tracker::loadTypeWithDialog(FileTypes eLoadType, bool suspendPlayer/* = tru
 	{
 		case FileTypes::FileTypeSongAllModules:
 		{
-			if (!checkForChangesOpenModule())
-				return false;
-			openPanel = new PPOpenPanel(screen, "Open module");		
-			openPanel->addExtensions(fileExtProvider.getModuleExtensions());
+			checkForChangesOpenModule([&](bool sahaosifhkahsf)
+      		  {
+				  openPanel = new PPOpenPanel(screen, "Open module");
+				  openPanel->addExtensions(fileExtProvider.getModuleExtensions());
+			
+			  });
 			break;
 		}
 	
@@ -2953,7 +2955,7 @@ bool Tracker::prepareSavingWithDialog(FileTypes eSaveType)
 }
 
 // Save different things
-bool Tracker::saveTypeWithDialog(FileTypes eSaveType, EventListenerInterface* fileSystemChangedListener/* = NULL*/)
+void Tracker::saveTypeWithDialog(FileTypes eSaveType, EventListenerInterface* fileSystemChangedListener/* = NULL*/)
 {
 	if (savePanel == NULL)
 	{
@@ -2969,79 +2971,77 @@ bool Tracker::saveTypeWithDialog(FileTypes eSaveType, EventListenerInterface* fi
 	
 	bool res = true;
 	
-	if (savePanel->runModal() == PPModalDialog::ReturnCodeOK)
+	savePanel->runModal([&] (PPModalDialog::ReturnCodes code, PPString file)
 	{
-		PPSystemString file = savePanel->getFileName();
-		
-		if (file.length())
-		{
-			loadingParameters.lastError = "Error while saving";
-			
-			signalWaitState(true);
-			
-			switch (eSaveType)
-			{
-				case FileTypes::FileTypeSongMOD:
-					commitListBoxChanges();
-					res = moduleEditor->saveSong(file, ModuleEditor::ModSaveTypeMOD);
-					break;
-					
-				case FileTypes::FileTypeSongXM:
-					commitListBoxChanges();
-					res = moduleEditor->saveSong(file, ModuleEditor::ModSaveTypeXM);
-					break;
-					
-				case FileTypes::FileTypeTrackXT:
-				{
-					res = getPatternEditor()->saveExtendedTrack(file);
-					break;
-				}
-					
-				case FileTypes::FileTypePatternXP:
-				{
-					res = getPatternEditor()->saveExtendedPattern(file);
-					break;
-				}
-					
-				case FileTypes::FileTypeInstrumentXI:
-					commitListBoxChanges();
-					res = moduleEditor->saveInstrument(file, listBoxInstruments->getSelectedIndex());
-					break;
-					
-				case FileTypes::FileTypeSampleWAV:
-					commitListBoxChanges();
-					res = moduleEditor->saveSample(file, listBoxInstruments->getSelectedIndex(), 
+	   if (code == PPModalDialog::ReturnCodeOK)
+	   {
+		   if (file.length())
+		   {
+			   loadingParameters.lastError = "Error while saving";
+			   
+			   signalWaitState(true);
+			   
+			   switch (eSaveType)
+			   {
+				   case FileTypes::FileTypeSongMOD:
+					   commitListBoxChanges();
+					   res = moduleEditor->saveSong(file, ModuleEditor::ModSaveTypeMOD);
+					   break;
+					   
+				   case FileTypes::FileTypeSongXM:
+					   commitListBoxChanges();
+					   res = moduleEditor->saveSong(file, ModuleEditor::ModSaveTypeXM);
+					   break;
+					   
+				   case FileTypes::FileTypeTrackXT:
+				   {
+					   res = getPatternEditor()->saveExtendedTrack(file);
+					   break;
+				   }
+					   
+				   case FileTypes::FileTypePatternXP:
+				   {
+					   res = getPatternEditor()->saveExtendedPattern(file);
+					   break;
+				   }
+					   
+				   case FileTypes::FileTypeInstrumentXI:
+					   commitListBoxChanges();
+					   res = moduleEditor->saveInstrument(file, listBoxInstruments->getSelectedIndex());
+					   break;
+					   
+				   case FileTypes::FileTypeSampleWAV:
+					   commitListBoxChanges();
+					   res = moduleEditor->saveSample(file, listBoxInstruments->getSelectedIndex(),
 												   listBoxSamples->getSelectedIndex(), ModuleEditor::SampleFormatTypeWAV);
-					break;
-					
-				case FileTypes::FileTypeSampleIFF:
-					commitListBoxChanges();
-					res = moduleEditor->saveSample(file, listBoxInstruments->getSelectedIndex(), 
+					   break;
+					   
+				   case FileTypes::FileTypeSampleIFF:
+					   commitListBoxChanges();
+					   res = moduleEditor->saveSample(file, listBoxInstruments->getSelectedIndex(),
 												   listBoxSamples->getSelectedIndex(), ModuleEditor::SampleFormatTypeIFF);
-					break;
-			}
-			
-			if (res && fileSystemChangedListener)
-			{
-				PPEvent event(eFileSystemChanged);
-				fileSystemChangedListener->handleEvent(reinterpret_cast<PPObject*>(this), &event);
-			}
-			
-			signalWaitState(false);
-			screen->paint();
-			updateWindowTitle(moduleEditor->getModuleFileName());
-		}
-		
-	}
-	
-	if (!res)
-		showMessageBox(MESSAGEBOX_UNIVERSAL, loadingParameters.lastError, MessageBox_OK);	
-	
-	delete savePanel;
-	savePanel = NULL;
-	fileSystemChangedListener = NULL;
-	
-	return res;
+					   break;
+			   }
+			   
+			   if (res && fileSystemChangedListener)
+			   {
+				   PPEvent event(eFileSystemChanged);
+				   fileSystemChangedListener->handleEvent(reinterpret_cast<PPObject*>(this), &event);
+			   }
+			   
+			   signalWaitState(false);
+			   screen->paint();
+			   updateWindowTitle(moduleEditor->getModuleFileName());
+			   
+			   if (!res)
+				   showMessageBox(MESSAGEBOX_UNIVERSAL, loadingParameters.lastError, MessageBox_OK);
+			   
+			   delete savePanel;
+			   savePanel = NULL;
+			   fileSystemChangedListener = NULL;
+		   }
+	   }
+	});
 }
 
 bool Tracker::saveCurrentModuleAsSelectedType()

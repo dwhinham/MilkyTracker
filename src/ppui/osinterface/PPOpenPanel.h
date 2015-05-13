@@ -30,9 +30,7 @@ class PPOpenPanel : public PPModalDialog
 {
 protected:
 	PPSimpleVector<Descriptor> items;
-
-	PPSystemString fileName;
-
+	
 	char* caption;
 
 public:
@@ -49,9 +47,7 @@ public:
 
 	virtual void addExtension(const PPString& ext, const PPString& desc);
 
-	virtual const PPSystemString& getFileName() { return fileName; }
-
-	virtual ReturnCodes runModal();
+	virtual void runModal(std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion);
 
 };
 

@@ -33,6 +33,9 @@
 
 #include "BasicTypes.h"
 
+#include <SDL.h>
+#include <functional>
+
 class PPScreen;
 
 class PPModalDialog
@@ -58,7 +61,9 @@ public:
 	{ 
 	}
 	
-	virtual ReturnCodes runModal() = 0;
+	void processEvent(SDL_Event event);
+	
+	virtual void runModal(std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion) = 0;
 };
 
 #endif

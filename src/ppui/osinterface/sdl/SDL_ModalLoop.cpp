@@ -56,11 +56,9 @@ extern PPMutex* globalMutex;
 // after...
 //
 /////////////////////////////////////////////////////////////////
-PPModalDialog::ReturnCodes SDL_runModalLoop(PPScreen* screen, PPDialogBase* dialog)
-{
-	bool exitModalLoop = false;
-	SDL_Event event;
 
+void SDL_runModalLoop(PPScreen* screen, PPDialogBase* dialog, std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion)
+{
 	// screen might be disabled in a stackable fashion
 	pp_uint32 screenEnableStackCount = 0;
 	while (!screen->isDisplayEnabled())
@@ -68,11 +66,6 @@ PPModalDialog::ReturnCodes SDL_runModalLoop(PPScreen* screen, PPDialogBase* dial
 		screen->enableDisplay(true);
 		screenEnableStackCount++;
 	}
-
-	// This is the responder for buttons invoked by the modal dialog
-	ModalLoopResponder modalLoopResponder(exitModalLoop);
-
-	dialog->setResponder(&modalLoopResponder);
 
 	// Detach the event listener from the screen, this will actually detach the entire tracker from the screen
 	EventListenerInterface* eventListener = screen->detachEventListener();
@@ -86,48 +79,9 @@ PPModalDialog::ReturnCodes SDL_runModalLoop(PPScreen* screen, PPDialogBase* dial
 	// Show it
 	dialog->show();
 
-	// Now to the tricky part, since a modal dialog has been invoked through a OS event, globalMutex is in locked state
-	// so to allow further event processing we must unlock the mutex first
-	// -- really messy and critical --
-	if (globalMutex)
-		globalMutex->unlock();
+	screen->startModal(dialog, onCompletion);
 
-	// Create our own event loop
-	while (!exitModalLoop && SDL_WaitEvent(&event)) 
-	{
-		switch (event.type) 
-		{
-			case SDL_MOUSEMOTION:
-			{
-				// ignore old mouse motion events in the event queue
-				SDL_Event new_event;
-				
-				if (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0)
-				{
-					while (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0);
-					processSDLEvents(new_event);
-				} 
-				else 
-				{
-					processSDLEvents(event);
-				}
-				break;
-			}
-			
-			case SDL_USEREVENT:
-				processSDLUserEvents((const SDL_UserEvent&)event);
-				break;
-			
-			default:
-				processSDLEvents(event);
-				break;
-		}
-	}	
-
-	// pretend nothing happened at all, continue with main event loop after we're finished here
-	if (globalMutex)
-		globalMutex->lock();
-
+/*
 	// re-attach tracker
 	screen->attachEventListener(eventListener);	
 
@@ -136,7 +90,37 @@ PPModalDialog::ReturnCodes SDL_runModalLoop(PPScreen* screen, PPDialogBase* dial
 	{
 		screen->enableDisplay(false);
 		screenEnableStackCount--;
-	}
-	
-	return modalLoopResponder.getReturnCode();
+	}*/
 }
+
+void PPModalDialog::processEvent(SDL_Event event)
+{
+	switch (event.type)
+	{
+		case SDL_MOUSEMOTION:
+		{
+			// ignore old mouse motion events in the event queue
+			SDL_Event new_event;
+			
+			if (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0)
+			{
+				while (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0);
+				processSDLEvents(new_event);
+			}
+			else
+			{
+				processSDLEvents(event);
+			}
+			break;
+		}
+			
+		case SDL_USEREVENT:
+			processSDLUserEvents((const SDL_UserEvent&)event);
+			break;
+			
+		default:
+			processSDLEvents(event);
+			break;
+	}
+}
+

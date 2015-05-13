@@ -1,5 +1,5 @@
-#                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
+#                                               -*- Autoconf -*-
 
 AC_PREREQ(2.61)
 AC_INIT(MilkyTracker, 0.90.86, www.milkytracker.net)
@@ -21,7 +21,7 @@ AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS_ONCE([fcntl.h inttypes.h limits.h malloc.h memory.h stddef.h stdint.h stdlib.h string.h strings.h sys/ioctl.h sys/param.h sys/time.h unistd.h],,AC_MSG_ERROR([One or more required header files are missing]))
 # AC_CHECK_HEADER(zzip/lib.h,,AC_MSG_ERROR("Cannot find zzip/lib.h"))
-AC_CHECK_HEADER(pthread.h,,[AC_MSG_ERROR("Cannot find pthread.h")])
+#AC_CHECK_HEADER(pthread.h,,[AC_MSG_ERROR("Cannot find pthread.h")])
 
 # Checks for libraries.
 AC_ARG_WITH([alsa],
@@ -47,7 +47,7 @@ AC_SEARCH_LIBS(gzopen, z, AC_DEFINE([HAVE_LIBZ], [1], [Define to 1 if you have t
 #AC_CHECK_LIB(zzip, zzip_file_open,,AC_MSG_ERROR("Cannot find -lzzip"))
 #PKG_CHECK_MODULES([ZZIP],[zziplib >= 0.10.75])
 
-AC_CHECK_LIB(pthread, pthread_create,[LIBS="$LIBS -lpthread"],AC_MSG_ERROR("Cannot find -lpthread"))
+#AC_CHECK_LIB(pthread, pthread_create,[LIBS="$LIBS -lpthread"],AC_MSG_ERROR("Cannot find -lpthread"))
 SDL_VERSION=2.0.0
 AM_PATH_SDL2($SDL_VERSION,, AC_MSG_ERROR([Please install libSDL]))
 CPPFLAGS="$CPPFLAGS -D__FORCE_SDL_AUDIO__"
@@ -55,8 +55,8 @@ CPPFLAGS="$CPPFLAGS -D__FORCE_SDL_AUDIO__"
 # Check that SDL supports the X11 wm
 AC_MSG_CHECKING([whether SDL supports X11])
 OLDCPPFLAGS=$CPPFLAGS
-CPPFLAGS=$SDL_CFLAGS
 AC_COMPILE_IFELSE(
+CPPFLAGS=$SDL_CFLAGS
 	[AC_LANG_SOURCE([#include<SDL_syswm.h>
 	const int test = SDL_SYSWM_X11;])],
 	[AC_MSG_RESULT([yes])]

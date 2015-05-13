@@ -32,6 +32,7 @@
 #include <SDL.h>
 #include "SDL_ModalLoop.h"
 #include "DialogFileSelector.h"
+#include "PPMessageBox.h"
 
 PPOpenPanel::PPOpenPanel(PPScreen* screen, const char* caption) :
 	PPModalDialog(screen)
@@ -53,7 +54,7 @@ void PPOpenPanel::addExtension(const PPString& ext, const PPString& desc)
 	items.add(d);
 }
 
-PPOpenPanel::ReturnCodes PPOpenPanel::runModal()
+void PPOpenPanel::runModal(std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion)
 {
 	// Create a message box (the message box will invoke the responder)
 	DialogFileSelector* dialog = new DialogFileSelector(screen, NULL, PP_DEFAULT_ID, this->caption);
@@ -65,14 +66,5 @@ PPOpenPanel::ReturnCodes PPOpenPanel::runModal()
 		dialog->addExtension(ext, desc);
 	}
 
-	ReturnCodes result = SDL_runModalLoop(screen, dialog);
-	
-	PPSystemString pathEntry(dialog->getSelectedPathFull());
-	
-	// this is no longer needed
-	delete dialog;
-	
-    fileName = ((result == ReturnCodeOK) ? pathEntry : ""); 
-	
-	return result;
+	SDL_runModalLoop(screen, dialog, onCompletion);
 }

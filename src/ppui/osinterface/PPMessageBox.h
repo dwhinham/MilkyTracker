@@ -45,7 +45,7 @@ public:
 	{
 	}
 	
-	virtual ReturnCodes runModal();
+	virtual void runModal(std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion);
 };
 
 #endif

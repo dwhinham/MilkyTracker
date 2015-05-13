@@ -97,6 +97,6 @@ public:
 class PPScreen;
 class PPDialogBase;
 
-PPModalDialog::ReturnCodes SDL_runModalLoop(PPScreen* screen, PPDialogBase* dialog);
+void SDL_runModalLoop(PPScreen* screen, PPDialogBase* dialog, std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion);
 
 #endif

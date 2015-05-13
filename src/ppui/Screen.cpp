@@ -56,7 +56,8 @@ PPScreen::PPScreen(PPDisplayDeviceBase* displayDevice, EventListenerInterface* e
 	modalControl(NULL),
 	showDragHilite(false),
 	rootContainer(NULL),
-	lastMouseOverControl(NULL)
+	lastMouseOverControl(NULL),
+	currentModal(NULL)
 {
 	contextMenuControls = new PPSimpleVector<PPControl>(16, false);
 	timerEventControls = new PPSimpleVector<PPControl>(16, false);
@@ -861,4 +862,12 @@ void PPScreen::shutDown()
 	if (displayDevice)
 		displayDevice->shutDown();
 }
+
+void PPScreen::startModal(PPDialogBase *dialog, std::function<void(PPModalDialog::ReturnCodes, PPString)> onCompletion)
+{
+	this->currentModal = dialog;
+}
+
+
+
 

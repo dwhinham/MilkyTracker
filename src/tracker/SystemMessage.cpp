@@ -31,6 +31,7 @@
 #include "SystemMessage.h"
 #include "Screen.h"
 #include "PPMessageBox.h"
+#include "PPModalDialog.h"
 
 SystemMessage::SystemMessage(PPScreen& screen, Messages message) :
 	screen(screen),
@@ -69,6 +70,8 @@ void SystemMessage::show()
 	if (header && message)
 	{
 		PPMessageBox messageBox(&screen, header, message);		
-		messageBox.runModal();
+		messageBox.runModal([] (PPModalDialog::ReturnCodes, PPString) {
+		
+		});
 	}
 }

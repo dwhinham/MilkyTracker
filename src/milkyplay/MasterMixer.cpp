@@ -91,7 +91,7 @@ mp_sint32 MasterMixer::openAudioDevice()
 			
 		audioDriver = audioDriverManager->getPreferredAudioDriver();
 	}
-		
+	
 	if (bufferSize == 0)
 	{
 		bufferSize = audioDriver->getPreferredBufferSize();

@@ -56,6 +56,10 @@
 #include "config.h"
 #endif
 
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -552,7 +556,7 @@ void translateKeyDownEvent(const SDL_Event& event)
 	printf ("DEBUG: Key pressed: VK: %d, SC: %d, Scancode: %d\n", toVK(keysym), toSC(keysym), character);
 #endif
 
-	pp_uint16 chr[3] = {toVK(keysym), toSC(keysym), character};
+	pp_uint16 chr[3] = {toVK(keysym), toSC(keysym), static_cast<pp_uint16>(character)};
 
 #ifndef NOT_PC_KB
 	// Hack for azerty keyboards (num keys are shifted, so we use the scancodes)
@@ -746,7 +750,18 @@ void initTracker(pp_uint32 bpp, PPDisplayDevice::Orientations orientation,
 				 bool swapRedBlue, bool fullScreen, bool noSplash)
 {
 	// Initialize SDL
-	if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0 ) 
+
+#ifdef EMSCRIPTEN
+	fprintf(stderr, "This is an emscripten build");
+#else
+	fprintf(stderr, "This is not an emscripten build");
+#endif
+	
+	if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
+		#ifndef EMSCRIPTEN
+				  | SDL_INIT_TIMER
+		#endif
+		) < 0 )
 	{
 		fprintf(stderr, "Couldn't initialize SDL: %s\n",SDL_GetError());
 		exit(EXIT_FAILURE);
@@ -854,12 +869,81 @@ void SendFile(char *file)
 	RaiseEventSerialized(&event);		
 }
 
+void process_event(SDL_Event event)
+{
+	switch (event.type)
+	{
+		case SDL_QUIT:
+			exitSDLEventLoop(false);
+			break;
+		case SDL_MOUSEMOTION:
+		{
+			// Ignore old mouse motion events in the event queue
+			SDL_Event new_event;
+			
+			if (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0)
+			{
+				while (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0);
+				processSDLEvents(new_event);
+			}
+			else
+			{
+				processSDLEvents(event);
+			}
+			break;
+		}
+			
+			// Open modules drag 'n dropped onto MilkyTracker (currently only works on Dock icon, OSX)
+		case SDL_DROPFILE:
+			SendFile(event.drop.file);
+			SDL_free(event.drop.file);
+			break;
+			
+			// Refresh GUI if window resized
+		case SDL_WINDOWEVENT:
+			switch (event.window.event) {
+				case SDL_WINDOWEVENT_RESIZED:
+					myTrackerScreen->update();
+			}
+			break;
+			
+		case SDL_USEREVENT:
+			processSDLUserEvents((const SDL_UserEvent&)event);
+			break;
+			
+		default:
+			processSDLEvents(event);
+			break;
+	}
+}
+
+bool letsTick = false;
+
+void tick()
+{
+	if(!letsTick)
+		return;
+	
+	SDL_Event event;
+	
+	if(SDL_PollEvent(&event) == 1)
+	{
+		process_event(event);
+	}
+}
+
 #if defined(__PSP__)
 extern "C" int SDL_main(int argc, char *argv[])
 #else
 int main(int argc, char *argv[])
 #endif
 {
+#ifdef EMSCRIPTEN
+	
+	emscripten_set_main_loop(tick, 0, 0);
+	
+#endif
+	
 	SDL_Event event;
 	char *loadFile = 0;
 	
@@ -983,88 +1067,52 @@ unrecognizedCommandLineSwitch:
 		RaiseEventSerialized(&event);
 	}
 	
+	letsTick = true;
+	
 	// Main event loop
-	done = 0;
-	while (!done && SDL_WaitEvent(&event)) 
-	{
-		switch (event.type) 
+	#ifndef EMSCRIPTEN
+	
+		done = 0;
+		while (!done && SDL_WaitEvent(&event)) 
 		{
-			case SDL_QUIT:
-				exitSDLEventLoop(false);
-				break;
-			case SDL_MOUSEMOTION:
-			{
-				// Ignore old mouse motion events in the event queue
-				SDL_Event new_event;
-				
-				if (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0)
-				{
-					while (SDL_PeepEvents(&new_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION) > 0);
-					processSDLEvents(new_event);
-				} 
-				else 
-				{
-					processSDLEvents(event);
-				}
-				break;
-			}
-
-			// Open modules drag 'n dropped onto MilkyTracker (currently only works on Dock icon, OSX)
-			case SDL_DROPFILE:
-				SendFile(event.drop.file);
-				SDL_free(event.drop.file);
-				break;
-
-			// Refresh GUI if window resized
-			case SDL_WINDOWEVENT:
-				switch (event.window.event) {
-					case SDL_WINDOWEVENT_RESIZED:
-						myTrackerScreen->update();
-				}
-				break;
-
-			case SDL_USEREVENT:
-				processSDLUserEvents((const SDL_UserEvent&)event);
-				break;
-
-			default:
-				processSDLEvents(event);
-				break;
+			process_event(event);
 		}
-	}
-
-	timerMutex->lock();
-	ticking = false;
-	timerMutex->unlock();
-
-	SDL_RemoveTimer(timer);
 	
-	timerMutex->lock();
-	globalMutex->lock();
-#ifdef HAVE_LIBASOUND
-	delete myMidiReceiver;
-#endif
-	delete myTracker;
-	myTracker = NULL;
-	delete myTrackerScreen;
-	myTrackerScreen = NULL;
-	delete myDisplayDevice;
-	globalMutex->unlock();
-	timerMutex->unlock();
-	SDL_Quit();
-	delete globalMutex;
-	delete timerMutex;
+		timerMutex->lock();
+		ticking = false;
+		timerMutex->unlock();
+		
+		SDL_RemoveTimer(timer);
+		
+		timerMutex->lock();
+		globalMutex->lock();
+	#ifdef HAVE_LIBASOUND
+		delete myMidiReceiver;
+	#endif
+		delete myTracker;
+		myTracker = NULL;
+		delete myTrackerScreen;
+		myTrackerScreen = NULL;
+		delete myDisplayDevice;
+		globalMutex->unlock();
+		timerMutex->unlock();
+		SDL_Quit();
+		delete globalMutex;
+		delete timerMutex;
+		
+		/* Quoting from README.Qtopia (Application Porting Notes):
+		 One thing I have noticed is that applications sometimes don't exit
+		 correctly. Their icon remains in the taskbar and they tend to
+		 relaunch themselves automatically. I believe this problem doesn't
+		 occur if you exit your application using the exit() method. However,
+		 if you end main() with 'return 0;' or so, this seems to happen.
+		 */
+	#ifdef __QTOPIA__
+		exit(0);
+	#else
+		return 0;
+	#endif
 	
-	/* Quoting from README.Qtopia (Application Porting Notes):
-	One thing I have noticed is that applications sometimes don't exit
-	correctly. Their icon remains in the taskbar and they tend to
-	relaunch themselves automatically. I believe this problem doesn't
-	occur if you exit your application using the exit() method. However,
-	if you end main() with 'return 0;' or so, this seems to happen.
-	*/
-#ifdef __QTOPIA__
-	exit(0);
-#else
-	return 0;
-#endif
+	#endif
+	
 }

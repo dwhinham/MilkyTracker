@@ -84,6 +84,9 @@ bool PPPathEntry_POSIX::isHidden() const
 
 bool PPPath_POSIX::updatePath()
 {
+	if(*current == '\0')
+		return true;
+	
 	return chdir(current) == 0;
 }
 
